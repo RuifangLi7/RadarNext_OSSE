@@ -1,0 +1,5 @@
+   &setup
+    tversion=1,
+    analysis_time = 2024050813,
+    dataPath = './',
+   /

@@ -1,0 +1,10 @@
+1. Compile: run build.sh to generate executable at build/bin directory. 
+   ./build.sh
+
+2. Go to radar.fd to simulate reflectivity from nature run(NR)
+   a) Horizontally interpolate NR to MRMS lat-lon grid and generate geopotential height and reflectivity fields separately.
+      ./run_nr2mrmsGrid.sh 
+
+   b) Vertically interpolate NR to MRMS levels and apply radar mask.
+      ./run_process_NSSL_mosaic.sh
+      

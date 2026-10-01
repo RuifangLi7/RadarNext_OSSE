@@ -1,0 +1,5 @@
+# Ignore temporary swp files
+*.swp
+
+# Ignore build directory
+build/
