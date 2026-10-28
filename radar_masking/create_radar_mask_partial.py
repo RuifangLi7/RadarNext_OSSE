@@ -17,8 +17,11 @@ from sys import exit
 from os.path import isfile, getsize
 
 #SETTINGS
-tag = "_MRMS" # for describing different tests (use leading underscore if non-empty)
-out_dir = "/work/noaa/wrfruc/jdduda/radar_mask"
+tag = "_slim_50pct_fill_1" # for describing different tests (use leading underscore if non-empty)
+root = "/work/noaa/wrfruc/jdduda/RadarNext"
+out_dir = f"{root}/masking"
+#US_radar_list_file = f"{root}/nexrad-stations-valid-2026.txt"
+US_radar_list_file = f"{root}/radar_network_lose_50pct_fill_1.txt"
 radar_dH = 30. # [m]
 cmap = colormaps['tab20']
 colors = cmap(np.linspace(0,1,21))
@@ -110,7 +113,7 @@ def alpha_to_num(input):
 # Decide on a grid to make the mask on
 if False:
  # Obtain nature run grid (from UPP files since there are some minor discrepancies between the grid from the geo_em.d01.nc file and the UPP files)
- grib2_grid_file = "/work/noaa/wrfruc/jdduda/radar_mask/nature_run_one_record.grib2"
+ grib2_grid_file = "/work/noaa/wrfruc/jdduda/RadarNext/nature_run_one_record.grib2"
  grbf = grib2io.open(grib2_grid_file,'r')
  rec = grbf[0]
  grid_lats,grid_lons = rec.latlons()
@@ -145,7 +148,7 @@ else:
  grid_lats_r = np.deg2rad(grid_lats)
  grid_lons_r = np.deg2rad(grid_lons)
  # Also need the terrain grid
- terrain_file = "/work/noaa/wrfruc/jdduda/NR_terrain_MRMS_grid.nc"
+ terrain_file = "/work/noaa/wrfruc/jdduda/RadarNext/NR_terrain_MRMS_grid.nc"
  nc = Dataset(terrain_file,'r')
  terrain_2D = nc.variables['HGT_M'][:][0,:,:]
  nc.close()
@@ -154,16 +157,19 @@ grid_lats_3d = np.broadcast_to(grid_lats,(len(MRMS_heights),grid_lats.shape[0],g
 grid_lons_3d = np.broadcast_to(grid_lons,(len(MRMS_heights),grid_lons.shape[0],grid_lons.shape[1]))
 
 # Grab radar site information
-US_radar_file = "/work/noaa/wrfruc/jdduda/radar_mask/nexrad-stations-valid-2026.txt"
-df = pd.read_table(US_radar_file,sep="\s+",header=0,skiprows=[1],index_col='ICAO')
+df = pd.read_table(US_radar_list_file,sep="\s+",header=0,skiprows=[1],index_col='ICAO')
 radar_sites_dict = df.to_dict(orient='index')
-Canadian_radar_file = "/work/noaa/wrfruc/jdduda/radar_mask/Canadian_radar_list.txt"
+#US_radar_file = "/work/noaa/wrfruc/jdduda/radar_mask/radar_network_locations_0.txt"
+#df = pd.read_table(US_radar_file,sep="\s+",index_col=0,names=("ICAO","LON","LAT"))
+#radar_sites_dict = df.to_dict(orient='index')
+Canadian_radar_file = f"{root}/Canadian_radar_list.txt"
 df = pd.read_table(Canadian_radar_file,sep = "\s+",header=0,skiprows=[1],index_col="STATION_ID")
 df.index.name = "ICAO"
 can_dict = df.to_dict(orient='index')
 radar_sites_dict.update(can_dict)
+radar_sites_keys = list(radar_sites_dict.keys())
 remove_list = []
-for name in radar_sites_dict.keys():
+for i,name in enumerate(radar_sites_dict.keys()):
    if radar_sites_dict[name]['LAT'] > 53.138378: # This value is 0.5 degree larger than the max latitude in the NR grid
       remove_list.append(name)
       continue
@@ -171,13 +177,16 @@ for name in radar_sites_dict.keys():
    radar_sites_dict[name]['VCP'] = VCP12
    if name[0] == "K": # Only US radars
       radar_sites_dict[name]['ELEV'] = radar_sites_dict[name]['ELEV']/3.821 # convert from [ft] to [m]
+#   if name[0] != "C": # Not Canadian radars
+#      radar_sites_dict[name]['ELEV'] = 0.0
+#      radar_sites_dict[name]['BAND'] = "S"
+#      radar_sites_dict[name]['NAME'] = radar_sites_keys[i]
 for i in range(len(remove_list)):
    del radar_sites_dict[remove_list[i]]
 n_radars = len(radar_sites_dict)
 print(f"Final analysis will include {n_radars} radars in total. Here they are:")
 for k in radar_sites_dict.keys():
    print(k,radar_sites_dict[k]['LAT'],radar_sites_dict[k]['LON'],radar_sites_dict[k]['ELEV'])
-
 # Setup mask arrays
 # THIS ITERATION OF THE MASKING LOGIC PRIORITIZES THE BEAM HEIGHT OVER DISTANCE FROM ANY RADAR SITE
 # In other words, if there is a grid point that has two radars within {max_radar_distance}, the below
@@ -193,7 +202,7 @@ closest_radar_dist_grid = np.full((grid_ny,grid_nx),1e7,dtype=float)
 closest_radar_dir_grid = np.zeros((grid_ny,grid_nx),dtype=float)
 #closest_radar_id_grid = np.zeros((grid_ny,grid_nx),dtype=int)
 distance_3D = np.full((len(MRMS_heights),grid_ny,grid_nx),1e6,dtype=float)
-wavelength_band = np.full((grid_ny,grid_nx),-1,dtype=int)
+wavelength_band = np.full((len(MRMS_heights),grid_ny,grid_nx),-1,dtype=int)
 final_radar_mask = np.full((len(MRMS_heights),grid_ny,grid_nx),-1,dtype=int)
 n_radars_used = 0
 # For allowing for the fact that any given 3D grid point may be "illuminated" by multiple radars and how to handle subsequent processing
@@ -241,8 +250,8 @@ for rn,rad in enumerate(radar_sites_dict.keys()):
 #  closest_radar_id_grid = in_ID
   wavelength_band = in_band
   illuminated_min_dist = in_illum_dist_min
-  illuminated_dist = in_illum_dist
- # illuminated_radar = in_illum_rad
+#  illuminated_dist = in_illum_dist
+  illuminated_radar = in_illum_rad
   break
 # End loop
 if rn == n_radars-1:
@@ -253,8 +262,8 @@ if rn == n_radars-1:
  in_elevation_angle = nco.variables['elevation_angle'][:]
  in_slant_range = nco.variables['slant_range'][:]
  in_mask = nco.variables['mask'][:]
-# in_ID = nco.variables['closest_radar_ID'][:]
- in_band = ncf.variables['wavelength_band_num'][:]
+ in_ID = nco.variables['illuminated_radar_ID'][:]
+ in_band = nco.variables['wavelength_band_num'][:]
  in_illum_rad = nco.variables['illuminated_radar_ID'][:]
  in_illum_dist = nco.variables['illuminated_min_distance'][:]
  nco.close()
@@ -401,7 +410,7 @@ for rn,rad in enumerate(radar_sites_dict.keys()):
             this_radar_min_height[j,i] = beam_height
          #   closest_radar_dir_grid[j,i] = bearing[j,i]
          #   closest_radar_id_grid[j,i] = rn+1
-            wavelength_band[j,i] = alpha_to_num(radar_sites_dict[rad]['BAND'])
+         #   wavelength_band[j,i] = alpha_to_num(radar_sites_dict[rad]['BAND'])
             break
          else:
           continue
@@ -435,6 +444,7 @@ for rn,rad in enumerate(radar_sites_dict.keys()):
  closer_idx = np.argwhere(closer_mask)
  closest_radar_dir_grid[closer_idx[:,1],closer_idx[:,2]] = bearing[closer_idx[:,1],closer_idx[:,2]]
  illuminated_radar[closer_mask] = rn+1
+ wavelength_band[closer_mask] = alpha_to_num(radar_sites_dict[rad]['BAND'])
  final_radar_mask[mask_z,mask_y,mask_x] = 1
  # The point is to assign whatever slant range value occurs in (closer_mask) to "closest_radar_slant_range"
  timea = default_timer()
@@ -460,7 +470,7 @@ for rn,rad in enumerate(radar_sites_dict.keys()):
 # varmax = ncf.createVariable('max_beam_height','f',dimensions=(dimy,dimx))
  varangle = ncf.createVariable('elevation_angle','f',dimensions=(dimz,dimy,dimx))
  varslant = ncf.createVariable('slant_range','f',dimensions=(dimz,dimy,dimx))
- varband = ncf.createVariable('wavelength_band_num','i2',dimensions=(dimy,dimx))
+ varband = ncf.createVariable('wavelength_band_num','i2',dimensions=(dimz,dimy,dimx))
  varid = ncf.createVariable('illuminated_radar_ID','i2',dimensions=(dimz,dimy,dimx))
  var2 = ncf.createVariable('illuminated_min_distance','f',dimensions=(dimz,dimy,dimx))
  var3 = ncf.createVariable('illuminated_dist_this_radar','f',dimensions=(dimz,dimy,dimx))
@@ -493,20 +503,16 @@ dimy = ncf.createDimension('latitude',grid_ny)
 dimx = ncf.createDimension('longitude',grid_nx)
 dimz = ncf.createDimension('height',len(MRMS_heights))
 varz = ncf.createVariable('MRMS_heights','f4',dimensions=(dimz))
-#varid = ncf.createVariable('closest_radar_ID','i2',dimensions=(dimy,dimx))
-#vardist = ncf.createVariable('distance_to_closest_radar_3D','f',dimensions=(dimz,dimy,dimx))
 vardir = ncf.createVariable('azimuth_to_closest_radar','f',dimensions=(dimy,dimx))
 varmask = ncf.createVariable('mask','i2',dimensions=(dimz,dimy,dimx))
 varangle = ncf.createVariable('elevation_angle','f',dimensions=(dimz,dimy,dimx))
 varslant = ncf.createVariable('slant_range','f',dimensions=(dimz,dimy,dimx))
-varband = ncf.createVariable('wavelength_band_num','i2',dimensions=(dimy,dimx))
+varband = ncf.createVariable('wavelength_band_num','i2',dimensions=(dimz,dimy,dimx))
 var1 = ncf.createVariable('illuminated_radar_ID','i2',dimensions=(dimz,dimy,dimx))
 var2 = ncf.createVariable('illuminated_min_distance','f',dimensions=(dimz,dimy,dimx))
 varz[:] = MRMS_heights
 varmask[:] = final_radar_mask
-#varid[:] = closest_radar_id_grid
 vardir[:] = closest_radar_dir_grid
-#vardist[:] = distance_3D
 varangle[:] = beam_angle_at_height
 varslant[:] = closest_radar_slant_range
 var1[:] = illuminated_radar
@@ -516,68 +522,8 @@ varband.note = "1 = S-band; 2 = C-band; 3 = X-band"
 ncf.radars_used = used_radars
 ncf.radar_count = n_radars_used
 ncf.radar_IDs = "closest_radar_ID is an integer corresponding to the list 'radars_used'"
-ncf.values_key = "1 - within mask; 0 - outside of mask (but point was checked); -1 - gridpoint not checked, but assumed outside mask"
+ncf.values_key = "1 - within mask; -1 otherwise (no 0 to denote whether a point was checked or not)"
 ncf.grid_projection = "MRMS grid (0.01 x 0.01 deg.)"
 ncf.close()
 print("3D radar mask created")
-
-if True:
- height_levs = np.concatenate((np.arange(1000.,1000.,100.),np.arange(1000.,10000,500.),np.arange(10000,20000.1,1000.)))
- distance_levs = np.arange(50.,750.,50.)
- angle_levs = np.arange(0,360.1,15.)
-# plt.figure(figsize=(fig_x,fig_y))
-# ax = plt.gcf().add_axes([0.01,0.01,0.98,0.98],projection=prj)
-# ax.set_extent(extent,crs=prj)
-# ax.add_feature(cfeature.STATES.with_scale('50m'),edgecolor='black',linewidth=1)
-# cf = ax.contourf(grid_lons,grid_lats,min_beam_height_grid,levels = height_levs,cmap=colormaps['CMRmap_r'],norm='linear',vmin=0,vmax=20000.,extend='both',transform=prj)
-# cb = plt.colorbar(mappable=cf,orientation='horizontal',fraction=0.1,pad=0.01,shrink=0.8,aspect=50)
-# cb.ax.tick_params(labelsize=6)
-# cb.set_label("Minimum height of radar coverage [m ASL]",fontsize=8)
-# plt.savefig(f"{out_dir}/min_beam_height{tag}.png",dpi=150)
-# plt.close()
-
-# plt.figure(figsize=(fig_x,fig_y))
-# ax = plt.gcf().add_axes([0.01,0.01,0.98,0.98],projection=prj)
-# ax.set_extent(extent,crs=prj)
-# ax.add_feature(cfeature.STATES.with_scale('50m'),edgecolor='black',linewidth=1)
-# cf = ax.contourf(grid_lons,grid_lats,max_beam_height_grid,levels = np.arange(2500.,25000.1,2500.),cmap=colormaps['CMRmap_r'],norm='linear',vmin=0,vmax=25000.,extend='both',transform=prj)
-# cb = plt.colorbar(mappable=cf,orientation='horizontal',fraction=0.1,pad=0.01,shrink=0.8,aspect=50)
-# cb.ax.tick_params(labelsize=6)
-# cb.set_label("Maximum height of radar coverage [m ASL]",fontsize=8)
-# plt.savefig(f"{out_dir}/max_beam_height{tag}.png",dpi=150)
-# plt.close()
-
- for i,z in enumerate(MRMS_heights):
-  plt.figure(figsize=(fig_x,fig_y))
-  ax = plt.gcf().add_axes([0.01,0.01,0.98,0.98],projection=prj)
-  ax.set_extent(extent,crs=prj)
-  ax.add_feature(cfeature.STATES.with_scale('50m'),edgecolor='black',linewidth=1)
-  cf = ax.contourf(grid_lons,grid_lats,closest_radar_slant_range[i,:,:]/1e3,levels = distance_levs,cmap=colormaps['CMRmap_r'],norm='linear',vmin=0.,vmax=550.,extend='both',transform=prj)
-  cb = plt.colorbar(mappable=cf,orientation='horizontal',fraction=0.1,pad=0.01,shrink=0.8,aspect=50)
-  cb.ax.tick_params(labelsize=6)
-  cb.set_label("Slant range to closest radar [m ASL]",fontsize=8)
-  plt.savefig(f"{out_dir}/nearest_radar_slant_range_{z}km{tag}.png",dpi=150)
-  plt.close()
-
-  plt.figure(figsize=(fig_x,fig_y))
-  ax = plt.gcf().add_axes([0.01,0.01,0.98,0.98],projection=prj)
-  ax.set_extent(extent,crs=prj)
-  ax.add_feature(cfeature.STATES.with_scale('50m'),edgecolor='black',linewidth=1)
-  cf = ax.contourf(grid_lons,grid_lats,illuminated_min_dist[i,:,:]/1e3,levels = distance_levs,cmap=colormaps['CMRmap_r'],norm='linear',vmin=0.,vmax=500.,extend='both',transform=prj)
-  cb = plt.colorbar(mappable=cf,orientation='horizontal',fraction=0.1,pad=0.01,shrink=0.8,aspect=50)
-  cb.ax.tick_params(labelsize=6)
-  cb.set_label("Distance to radar providing minimum height coverage [km]",fontsize=8)
-  plt.savefig(f"{out_dir}/nearest_radar_dist_{z}km{tag}.png",dpi=150)
-  plt.close()
-
- plt.figure(figsize=(fig_x,fig_y))
- ax = plt.gcf().add_axes([0.01,0.01,0.98,0.98],projection=prj)
- ax.set_extent(extent,crs=prj)
- ax.add_feature(cfeature.STATES.with_scale('50m'),edgecolor='black',linewidth=1)
- cf = ax.contourf(grid_lons,grid_lats,np.rad2deg(closest_radar_dir_grid),levels = angle_levs,cmap = colormaps['twilight'],norm = 'linear',vmin=0.,vmax=360.,transform=prj)
- cb = plt.colorbar(mappable=cf,orientation='horizontal',fraction=0.1,pad=0.01,shrink=0.8,aspect=50)
- cb.ax.tick_params(labelsize=6)
- cb.set_label(r"Angle to radar providing minimum height coveage [$\degree$]",fontsize=8)
- plt.savefig(f"{out_dir}/nearest_radar_angle{tag}.png",dpi=150)
- plt.close()
 print("script done")

@@ -1,6 +1,6 @@
 from cartopy import crs
 from cartopy import feature
-from matplotlib import use, colormaps
+from matplotlib import use, colormaps, colors
 use('agg')
 from netCDF4 import Dataset
 import matplotlib.pyplot as plt
@@ -10,6 +10,7 @@ from cartopy.io.shapereader import Reader
 from geopy import distance
 from math import sqrt, radians, cos, sin, acos
 from sys import exit
+import pickle
 
 maj_axis = distance.ELLIPSOIDS['WGS-84'][1]
 min_axis = distance.ELLIPSOIDS['WGS-84'][0]
@@ -43,9 +44,10 @@ def gc2d(lon1, lat1, lon2, lat2):
     return dist
 
 projPC = crs.PlateCarree()
+projAE = crs.AlbersEqualArea(central_longitude=-98.5833,central_latitude=39.833,standard_parallels=(30,45))
 
 # Get terrain and landmask information from nature run grid file
-geo_file = "/work/noaa/wrfruc/jdduda/NR_to_MRMS_grid.nc"
+geo_file = "/work/noaa/wrfruc/jdduda/RadarNext/NR_to_MRMS_grid.nc"
 nc = Dataset(geo_file,'r')
 terrain_height = nc.variables['HGT_M'][:][0,:,:]
 landmask = nc.variables['LANDMASK'][:][0,:,:]
@@ -124,26 +126,50 @@ ax.add_feature(feature.BORDERS.with_scale('50m'),linewidth=1,edgecolor='black')
 ax.add_geometries([conus_geom],crs=projPC,facecolor='none',edgecolor='black',linewidth=1,zorder=1)
 i = 0
 j = 0
+k = 0
+l = 0
 for record in reader.records():
-#   if "pacific" in record.attributes['NAME'].lower():
-#      print(record.attributes['NAME'],record.geometry.length)
-#      j += 1
-#      pacific_coast_geom = shapely.buffer(record.geometry,distance=1)
-#      if j == 1:
-#         union_pacific_coast_geom = pacific_coast_geom
-#      else:
-#         union_pacific_coast_geom = shapely.union(union_pacific_coast_geom,pacific_coast_geom)
+   if "pacific" in record.attributes['NAME'].lower():
+      trans_geom = projAE.project_geometry(record.geometry,src_crs=projPC)
+      j += 1
+      pacific_coast_geom = shapely.buffer(trans_geom,distance=40000.0)
+#      pacific_coast_geom = shapely.buffer(record.geometry,distance=0.36)
+      if j == 1:
+         union_pacific_coast_geom = pacific_coast_geom
+      else:
+         union_pacific_coast_geom = shapely.union(union_pacific_coast_geom,pacific_coast_geom)
+   if "atlantic" in record.attributes['NAME'].lower():
+      trans_geom = projAE.project_geometry(record.geometry,src_crs=projPC)
+      k += 1
+      atlantic_coast_geom = shapely.buffer(trans_geom,distance=40000.0)
+#      atlantic_coast_geom = shapely.buffer(record.geometry,distance=0.36)
+      if k == 1:
+         union_atlantic_coast_geom = atlantic_coast_geom
+      else:
+         union_atlantic_coast_geom = shapely.union(union_atlantic_coast_geom,atlantic_coast_geom)
+   if "gulf" in record.attributes['NAME'].lower():
+      trans_geom = projAE.project_geometry(record.geometry,src_crs=projPC)
+      l += 1
+      gulf_coast_geom = shapely.buffer(trans_geom,distance=40000.0)
+#      gulf_coast_geom = shapely.buffer(record.geometry,distance=0.36)
+      if l == 1:
+         union_gulf_coast_geom = gulf_coast_geom
+      else:
+         union_gulf_coast_geom = shapely.union(union_gulf_coast_geom,gulf_coast_geom)
    if "great lakes" in record.attributes['NAME'].lower():
-#    if record.geometry.length >= 0.5:
       i += 1
+#      pacific_coast_geom = shapely.buffer(trans_geom,distance=40000.0)
       lake_geom = shapely.buffer(record.geometry,distance=1)
       if i == 1:
          union_lake_geom = lake_geom
       else:
          union_lake_geom = shapely.union(union_lake_geom,lake_geom)
-#      lake_geom = shapely.buffer(union_lake_geom,distance=1.0)
 #      ax.add_geometries([record.geometry],crs=projPC,facecolor='none',edgecolor='salmon',linewidth=0.5,zorder=10)
 #      print(f"Great Lakes shapefile {i} has length {record.geometry.length:.4f}")
+coastal_geoms = shapely.union_all([union_pacific_coast_geom,union_atlantic_coast_geom,union_gulf_coast_geom])
+coastal_geoms_lat_lon = projPC.project_geometry(coastal_geoms,src_crs=projAE)
+with open("coastal_geometry.pkl",'wb') as f:
+   pickle.dump(coastal_geoms_lat_lon,f)
 #ax.add_geometries(union_lake_geom,crs=projPC,facecolor='none',edgecolor='salmon',linewidth=0.5,zorder=2)
 #ax.add_geometries(union_lake_geom,crs=projPC,facecolor='salmon',edgecolor='none',linewidth=0.5,zorder=1)
 land_border_shpfile = "/work/noaa/wrfruc/jdduda/CONUS_shapefiles/data/DoS_LSIB_v11_4_24Feb2025.shp"
@@ -156,8 +182,11 @@ for record in land_border_reader.records():
       # Index 0 of geoms is the classic land border between the northern lower 48 and southern Canada
       canada_us_border = record.geometry.geoms[0]
       border_lons,border_lats = canada_us_border.xy
+      trans_geom = projAE.project_geometry(canada_us_border,src_crs=projPC)
       # Create buffer around border
-      canada_border_buffer_poly = shapely.buffer(record.geometry.geoms[0],distance=0.9,single_sided=False)
+#      canada_border_buffer_poly = shapely.buffer(record.geometry.geoms[0],distance=0.09,single_sided=False)
+      trans_buffer = shapely.buffer(trans_geom,distance=10000.,single_sided=False)
+      canada_border_buffer_poly = projPC.project_geometry(trans_buffer,src_crs=projAE)
  #     border_lons = canada_us_border[0]
  #     border_lats = canada_us_border[1]
 #      shp_feat1 = feature.ShapelyFeature([canada_us_border],crs=projPC,facecolor='none',edgecolor='blue',linewidth=1)
@@ -166,7 +195,11 @@ for record in land_border_reader.records():
    if ("UNITED STATES" in record.attributes['COUNTRY1'].upper() or "UNITED STATES" in record.attributes['COUNTRY2'].upper()) and \
       ("MEXICO" in record.attributes['COUNTRY1'].upper() or "MEXICO" in record.attributes['COUNTRY2'].upper()):
       border_lons,border_lats = record.geometry.xy
-      mexico_border_buffer_poly = shapely.buffer(record.geometry,distance=0.9,single_sided=False)
+#      mexico_border_buffer_poly = shapely.buffer(record.geometry,distance=0.09,single_sided=False)
+      trans_geom = projAE.project_geometry(record.geometry,src_crs=projPC)
+      trans_buffer = shapely.buffer(trans_geom,distance=10000.,single_sided=False)
+#      mexico_border_buffer_poly = shapely.buffer(record.geometry,distance=0.09,single_sided=False)
+      mexico_border_buffer_poly = projPC.project_geometry(trans_buffer,src_crs=projAE)
 #      buffer_buffer_m = shapely.buffer(record.geometry,distance=0.1,single_sided=False)
 #      mbbp = shapely.union(mexico_border_buffer_poly,buffer_buffer_m)
 #      ax.add_geometries([record.geometry],crs=projPC,facecolor='none',edgecolor='darkorchid',linewidth=1)
@@ -191,9 +224,16 @@ mask_geom = shapely.union_all([piece3,piece4,Olympic_peninsula_geom])
 ax.add_geometries(geom_difference_canada,crs=projPC,facecolor='none',edgecolor='orange',linewidth=0.5,zorder=2)
 ax.add_geometries(geom_difference_mexico,crs=projPC,facecolor='none',edgecolor='lime',linewidth=0.5,zorder=2)
 ax.add_geometries(mask_geom,crs=projPC,facecolor='lightsteelblue',edgecolor='none',linewidth=1,zorder=1)
+hotpink = colors.to_rgb('hotpink')
+hotpink_t = np.append(hotpink,0.5)
+gold = colors.to_rgb('gold')
+gold_t = np.append(gold,0.5)
+ax.add_geometries(union_pacific_coast_geom,crs=projAE,facecolor=hotpink_t,edgecolor='deeppink',linewidth=0.5,zorder=3)
+ax.add_geometries(union_atlantic_coast_geom,crs=projAE,facecolor=hotpink_t,edgecolor='deeppink',linewidth=0.5,zorder=3)
+ax.add_geometries(union_gulf_coast_geom,crs=projAE,facecolor=gold_t,edgecolor='darkgoldenrod',linewidth=0.5,zorder=3)
 #ax.set_extent([-94,-74.0,40,50],crs=projPC)
 ax.set_extent(map_extent,crs=projPC)
 #plt.savefig("Great_Lakes_mask_diag_0p5.png",dpi=200)
-plt.savefig("masked_CONUS_radar_domain.png",dpi=200)
+plt.savefig("easy_CONUS_radar_mask_with_coasts.png",dpi=300)
 plt.close()
 

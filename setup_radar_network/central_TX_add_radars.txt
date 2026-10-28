@@ -1,0 +1,15 @@
+REMOVE:
+KGRK
+KEWX
+include TIAH
+include TDAL
+ICAO    NAME                           ST COUNTY                         LAT       LON        ELEV   BAND
+----    ------------------------------ -- ------------------------------ --------- ---------- ------ -----
+TIAH    HOUSTON_INTERNATIONAL          TX HARRIS                         30.065    -95.566944 253    C
+CSAN1   NORTH_SAN_ANTONIO_1            TX COMAL                          29.742    -98.471    1096   C
+CAUS1   NORTHWEST_AUSTIN_1             TX WILLIAMSON                     30.769    -97.926    951    C
+CWAC1   WEST_WACO_1                    TX MCLENNAN                       31.577    -97.574    883    C
+TDAL    DALLAS_LOVE_FIELD              TX DALLAS                         32.9261   -96.968056 623    C
+CATH    ATHENS                         TX HENDERSON                      32.202    -95.962    440    C
+CZUL	NORTH_ZULCH_COLLEGE_STATION    TX MADISON                        30.927    -96.081    338    C
+CLAG    LA_GRANGE                      TX FAYETTE                        29.938    -96.917    262    C

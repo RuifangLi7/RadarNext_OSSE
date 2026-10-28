@@ -1,0 +1,16 @@
+REMOVE:
+KLWX
+ICAO     NAME                           ST COUNTY                         LAT       LON        ELEV   BAND
+-----    ------------------------------ -- ------------------------------ --------- ---------- ------ -----
+CRCH     NORTHEAST_RICHMOND             VA KING_WILLIAM                   37.796    -77.283    233    C
+TBWI     BALTIMORE_WASHINGTON           MD ANNE ARUNDEL                   39.09     -76.63     299    C
+TIAD     WASHINGTON_DULLES              VA LOUDOUN                        39.083889 -77.528889 472    C
+TADW     ANDREWS_AFB                    MD PRINCE GEORGE'S                38.695    -76.845    344    C
+CELK     ELKTON                         MD CECIL                          39.62658  -75.794066 79     C
+TPHL     PHILADELPHIA                   NJ CAMDEN                         39.948889 -75.068889 154    C
+CLNCN    LANCASTER_NORTH                PA LANCASTER                      40.237    -76.389    1070   C
+TEWR     NEWARK                         NJ UNION                          40.593056 -74.27     135    C
+COYS     OYSTER_BAY_TOWN                NY NASSAU                         40.801    -73.463    262    C
+CNEW     NEWBURGH                       NY ORANGE                         40.801    -73.463    741    C
+CGLST    GLASTONBURY_HARTFORD           CT CAPITOL                        41.676    -72.506    702    C
+TBOS     BOSTON                         MA NORFOLK                        42.158056 -70.933056 262    C
