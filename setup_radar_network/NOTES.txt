@@ -1,0 +1,5 @@
+Radar network metadata collected from NCEI at https://www.ncei.noaa.gov/access/homr/
+
+Radar network files appended with an alphabetical letter such as "A" or "B" are individual networks.
+The difference comes from which radar in "mutual pairs" (two radars whose nearest radar is each other)
+was eliminated when slimming. To see how the names are set, examine thin_radar_network.py

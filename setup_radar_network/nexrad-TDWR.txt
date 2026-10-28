@@ -1,0 +1,44 @@
+30112653 TADW       ANDREWS AFB                    UNITED STATES        MD PRINCE GEORGE'S                38.695    -76.845    344    -5    TDWR                                               
+30112655 TATL       ATLANTA                        UNITED STATES        GA WEBSTER                        33.646944 -84.261944 1076   -5    TDWR                                               
+30112680 TBNA       NASHVILLE                      UNITED STATES        TN WILLIAMSON                     35.98     -86.661944 817    -6    TDWR                                               
+30112656 TBOS       BOSTON                         UNITED STATES        MA NORFOLK                        42.158056 -70.933056 262    -5    TDWR                                               
+30112657 TBWI       BALTIMORE WASHINGTON           UNITED STATES        MD ANNE ARUNDEL                   39.09     -76.63     299    -5    TDWR                                               
+30112658 TCLT       CHARLOTTE                      UNITED STATES        NC MECKLENBURG                    35.336944 -80.885    869    -5    TDWR                                               
+30112662 TCMH       COLUMBUS                       UNITED STATES        OH LICKING                        40.006111 -82.715    1148   -5    TDWR                                               
+30112663 TCVG       COVINGTON                      UNITED STATES        KY KENTON                         38.898056 -84.58     1053   -5    TDWR                                               
+30112664 TDAL       DALLAS LOVE FIELD              UNITED STATES        TX DALLAS                         32.926111 -96.968056 623    -6    TDWR                                               
+30112666 TDAY       DAYTON                         UNITED STATES        OH MIAMI                          40.021944 -84.123056 1020   -5    TDWR                                               
+30112699 TDCA       WASHINGTON NATIONAL            UNITED STATES        MD PRINCE GEORGE'S                38.758889 -76.961944 344    -5    TDWR                                               
+30112667 TDEN       DENVER                         UNITED STATES        CO ARAPAHOE                       39.728056 -104.52611 5702   -7    TDWR                                               
+30112665 TDFW       DALLAS FT WORTH                UNITED STATES        TX DENTON                         33.065    -96.918056 584    -6    TDWR                                               
+30112668 TDTW       DETROIT                        UNITED STATES        MI WAYNE                          42.111111 -83.515    771    -5    TDWR                                               
+30112683 TEWR       NEWARK                         UNITED STATES        NJ UNION                          40.593056 -74.27     135    -5    TDWR                                               
+30112670 TFLL       FT LAUDERDALE                  UNITED STATES        FL BROWARD                        26.143056 -80.343889 121    -5    TDWR                                               
+30112671 THOU       HOUSTON HOBBY                  UNITED STATES        TX BRAZORIA                       29.516111 -95.241944 118    -6    TDWR                                               
+30112697 TIAD       WASHINGTON DULLES              UNITED STATES        VA LOUDOUN                        39.083889 -77.528889 472    -5    TDWR                                               
+30112672 TIAH       HOUSTON INTERNATIONAL          UNITED STATES        TX HARRIS                         30.065    -95.566944 253    -6    TDWR                                               
+30112701 TICH       WICHITA                        UNITED STATES        KS SEDGWICK                       37.506944 -97.436944 1352   -6    TDWR                                               
+30112673 TIDS       INDIANAPOLIS                   UNITED STATES        IN HENDRICKS                      39.636944 -86.436111 846    -5    TDWR                                               
+30112682 TJFK       NEW YORK CITY JFK              UNITED STATES        NY KINGS                          40.588889 -73.881111 112    -5    TDWR                                               
+30112675 TLAS       LAS VEGAS                      UNITED STATES        NV CLARK                          36.143889 -115.00694 2057   -8    TDWR                                               
+30112661 TLVE       CLEVELAND                      UNITED STATES        OH LORAIN                         41.29     -82.008056 932    -5    TDWR                                               
+30112674 TMCI       KANSAS CITY                    UNITED STATES        MO PLATTE                         39.498056 -94.741944 1089   -6    TDWR                                               
+30112685 TMCO       ORLANDO INTERNATIONAL          UNITED STATES        FL ORANGE                         28.343889 -81.326111 171    -5    TDWR                                               
+30112659 TMDW       CHICAGO MIDWAY                 UNITED STATES        IL COOK                           41.651111 -87.73     764    -6    TDWR                                               
+30112686 TMEM       MEMPHIS                        UNITED STATES        MS DESOTO                         34.896111 -89.993056 482    -6    TDWR                                               
+30112677 TMIA       MIAMI                          UNITED STATES        FL MIAMI-DADE                     25.758056 -80.491111 125    -5    TDWR                                               
+30112678 TMKE       MILWAUKEE                      UNITED STATES        WI RACINE                         42.818889 -88.046111 932    -6    TDWR                                               
+30112679 TMSP       MINNEAPOLIS                    UNITED STATES        MN WASHINGTON                     44.871111 -92.933056 1122   -6    TDWR                                               
+30112681 TMSY       NEW ORLEANS                    UNITED STATES        LA ST. CHARLES                    30.021944 -90.403056 98     -6    TDWR                                               
+30112684 TOKC       NORMAN WFO                     UNITED STATES        OK CLEVELAND                      35.276111 -97.51     1309   -6    TDWR                                               
+30112660 TORD       CHICAGO OHARE                  UNITED STATES        IL COOK                           41.796944 -87.858056 745    -6    TDWR                                               
+30112700 TPBI       WEST PALM BEACH                UNITED STATES        FL PALM BEACH                     26.688056 -80.273056 135    -5    TDWR                                               
+30112688 TPHL       PHILADELPHIA                   UNITED STATES        NJ CAMDEN                         39.948889 -75.068889 154    -5    TDWR                                               
+30112689 TPHX       PHOENIX                        UNITED STATES        AZ MARICOPA                       33.421111 -112.16305 1089   -7    TDWR                                               
+30112690 TPIT       PITTSBURGH                     UNITED STATES        PA BEAVER                         40.501111 -80.486111 1385   -5    TDWR                                               
+30112691 TRDU       RALEIGH                        UNITED STATES        NC WAKE                           36.001944 -78.696944 515    -5    TDWR                                               
+30112676 TSDF       LOUISVILLE                     UNITED STATES        KY BULLITT                        38.046111 -85.61     732    -5    TDWR                                               
+30112692 TSLC       SALT LAKE CITY                 UNITED STATES        UT DAVIS                          40.966944 -111.93    4295   -7    TDWR                                               
+30112694 TSTL       ST LOUIS                       UNITED STATES        MO ST. CHARLES                    38.805    -90.488889 646    -6    TDWR                                               
+30112695 TTPA       TAMPA                          UNITED STATES        FL HILLSBOROUGH                   27.86     -82.518056 92     -5    TDWR                                               
+30112696 TTUL       TULSA                          UNITED STATES        OK TULSA                          36.071111 -95.826944 823    -6    TDWR                                               

@@ -18,19 +18,20 @@ from sys import argv, exit
 config['data_dir'] = "/work/noaa/wrfruc/jdduda/cartopy_shapefiles"
 time_start = default_timer()
 
+root = "/work/noaa/wrfruc/jdduda/RadarNext"
+
 case_date = argv[1]
 case_dt = datetime.strptime(case_date,'%Y%m%d%H%M')
-out_dir = f"/work/noaa/wrfruc/jdduda/RadarNext/processed_reflectivity/{case_dt.strftime('%Y%m%d-%H%M00')}"
+out_dir = f"{root}/processed_reflectivity/{case_dt.strftime('%Y%m%d-%H%M00')}"
 print(out_dir)
 makedirs(out_dir,exist_ok=True)
 if not isdir(out_dir):
    print(f"Failed to create out directory {out_dir}")
    exit(2)
-root = "/work/noaa/wrfruc/jdduda/radar_mask/"
-MRMS_dir = "/work2/noaa/wrfruc/Ruifang.Li/RadarNext_OSSE/Data/refl_simulated"
+MRMS_in_dir = "/work2/noaa/wrfruc/Ruifang.Li/RadarNext_OSSE/Data/refl_simulated"
 prod_name = "MergedReflectivityQC"
 
-mask_file = "/work/noaa/wrfruc/jdduda/radar_mask/radar_mask.nc"
+mask_file = f"{root}/masking/radar_mask.nc"
 nci = Dataset(mask_file,'r')
 radar_mask = nci.variables['mask'][:]
 slant_range = nci.variables['slant_range'][:]
@@ -107,9 +108,10 @@ min_axis = distance.ELLIPSOIDS['WGS-84'][0]
 Re = sqrt(maj_axis*min_axis)*1000.
 MRMS_heights = [0.50,0.75,1.0,1.25,1.50,1.75,2.0,2.25,2.50,2.75,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,10.,11.,12.,13.,14.,15.,16.,17.,18.,19] # [km]
 
-MRMS_lat_1 = 20.005
+# Since the latitude array in the raw MRMS files is inverted, I have to use inverted latitudes here, too.
+MRMS_lat_2 = 20.005
 MRMS_lon_1 = -129.995 # equivalent to 230.005 - 360
-MRMS_lat_2 = 54.995
+MRMS_lat_1 = 54.995
 MRMS_lon_2 = -60.005 # equivalent to 299.995 - 360
 grid_nx = 7000
 grid_ny = 3500
@@ -118,8 +120,14 @@ lon1d = np.linspace(MRMS_lon_1,MRMS_lon_2,grid_nx)
 grid_lons, grid_lats = np.meshgrid(lon1d,lat1d)
 grid_lats_r = np.deg2rad(grid_lats)
 grid_lons_r = np.deg2rad(grid_lons)
+# But the above also means I need to invert the products coming out of the mask file
+radar_mask = np.flip(radar_mask,axis=1)
+slant_range = np.flip(slant_range,axis=1)
+elevation_angle_3D = np.flip(elevation_angle_3D,axis=1)
+azimuths = np.flipud(azimuths)
+nearest_ID = np.flip(nearest_ID,axis=1)
 
-terrain_file = "/work/noaa/wrfruc/jdduda/NR_terrain_MRMS_grid.nc"
+terrain_file = "/work/noaa/wrfruc/jdduda/RadarNext/NR_terrain_MRMS_grid.nc"
 nc = Dataset(terrain_file,'r')
 terrain_2D = nc.variables['HGT_M'][:][0,:,:]
 nc.close()
@@ -136,16 +144,23 @@ print(f"Time to create smoothing ratio data was {time2-time_start:.1f} s")
 proj = ccrs.PlateCarree()
 
 # Full domain view
-lat2 = 53
-lat1 = 22.5
-lon1 = -130
-lon2 = -60
+#tag = ""
+#lat2 = 53
+#lat1 = 22.5
+#lon1 = -130
+#lon2 = -60
 # Zoomed in view
 # Texas
-lat1 = 28
-lat2 = 35
-lon1 = -100.5
-lon2 = -93.5
+#tag = "zoom_Texas_"
+#lat1 = 28
+#lat2 = 35
+#lon1 = -100.5
+#lon2 = -93.5
+tag = "zoom_NE"
+lat1 = 40
+lat2 = 49
+lon1 = -80
+lon2 = -70
 cb_fract = 0.1
 fig_x = 10
 AR = (lon2-lon1)/(lat2-lat1)
@@ -157,12 +172,14 @@ smoothed_reflectivity = np.zeros((len(MRMS_heights),grid_ny,grid_nx),dtype=float
 processed_reflectivity = np.zeros((len(MRMS_heights),grid_ny,grid_nx),dtype=float)
 for z,elev in enumerate(MRMS_heights):
  time1 = default_timer()
- dir = f"{MRMS_dir}/{case_dt.strftime('%Y%m%d-%H%M')}"
+ dir = f"{MRMS_in_dir}/{case_dt.strftime('%Y%m%d-%H%M')}"
  file = f"{dir}/{prod_name}_{elev:05.2f}_{MRMS_tstr}.grib2"
  if isfile(file):
   grb = grb2.open(file)
   rec = grb[0]
-  input_reflectivity = np.flipud(rec.data)
+# Change to retain inverted data 
+#  input_reflectivity = np.flipud(rec.data)
+  input_reflectivity = rec.data
   grb.close()
 
   input_reflectivity = np.where(input_reflectivity < -10.,np.nan,input_reflectivity)
@@ -181,10 +198,69 @@ for z,elev in enumerate(MRMS_heights):
      mask /= np.sum(mask)
      bin_convolved_refl = convolve_fft(input_reflectivity,mask,boundary='fill',nan_treatment='interpolate',preserve_nan=True,fill_value=0.)
      smoothed_reflectivity[z,rows,cols] = bin_convolved_refl[rows,cols]
+     if False:
+        plt.figure(figsize=(fig_x,fig_y))
+        ax = plt.gcf().add_axes([0.01,0.01,0.98,0.98],projection=proj)
+        ax.set_extent([lon1,lon2,lat1,lat2],crs=proj)
+        ax.coastlines(linewidth=0.5,resolution='50m')
+        ax.add_feature(cfeature.BORDERS,edgecolor='black',linewidth=1,zorder=3)
+        ax.add_feature(cfeature.STATES,edgecolor='0.5',linewidth=0.5,zorder=2)
+        cp = ax.contourf(grid_lons,grid_lats,bin_convolved_refl,colors=dBZ_colors,levels=dBZ_levs,extend='both',transform=proj,transform_first=True)
+        ct = ax.contour(grid_lons,grid_lats,beam_grid_size_ratio[z,:,:],levels=np.arange(2.0,9.1,1.0),colors=[1.0,0.5,0.5],linewidths=0.5)
+        clbls = ax.clabel(CS=ct,levels=ct.levels,colors='red',fontsize=6,fmt='%.0f')
+        for cl in clbls:
+         cl.set_rotation(0)
+        cb = plt.colorbar(mappable=cp,orientation='horizontal',fraction=cb_fract,shrink=0.5,aspect=40,pad=0.02,ticks=dBZ_levs)
+        cb.set_label(f"Reflectivity at {1e3*elev:.0f} m ASL",fontsize=8)
+        cb.ax.tick_params(labelsize=6)
+        plt.figtext(0.01,0.01,f"Convolution radius: {sz} grid squares",ha='left',va='bottom',fontsize=8,fontweight=300,bbox={'facecolor':'white','edgecolor':'black','pad':2},fontfamily='serif')
+        plt.savefig(f"{out_dir}/{tag}{sz:02d}-convolved_reflectivity_{1e3*elev:05.0f}m_{MRMS_tstr}.png",dpi=250)
+        plt.close()
+
+        plt.figure(figsize=(fig_x,fig_y))
+        ax = plt.gcf().add_axes([0.01,0.01,0.98,0.98],projection=proj)
+        ax.set_extent([lon1,lon2,lat1,lat2],crs=proj)
+        ax.coastlines(linewidth=0.5,resolution='50m')
+        ax.add_feature(cfeature.BORDERS,edgecolor='black',linewidth=1,zorder=3)
+        ax.add_feature(cfeature.STATES,edgecolor='0.5',linewidth=0.5,zorder=2)
+        cp = ax.contourf(grid_lons,grid_lats,smoothed_reflectivity[z,:,:],levels=np.arange(-10.,61.,10.),cmap='rainbow',extend='both',transform=proj,transform_first=True)
+        ct = ax.contour(grid_lons,grid_lats,beam_grid_size_ratio[z,:,:],levels=np.arange(2.0,9.1,1.0),colors=[1.0,0.5,0.5],linewidths=0.5)
+        clbls = ax.clabel(CS=ct,levels=ct.levels,colors='red',fontsize=6,fmt='%.0f')
+        for cl in clbls:
+         cl.set_rotation(0)
+        cb = plt.colorbar(mappable=cp,orientation='horizontal',fraction=cb_fract,shrink=0.5,aspect=40,pad=0.02,ticks=cp.levels)
+        cb.set_label(f"Reflectivity at {1e3*elev:.0f} m ASL",fontsize=8)
+        cb.ax.tick_params(labelsize=6)
+        plt.figtext(0.01,0.01,f"Convolution radius: {sz} grid squares",ha='left',va='bottom',fontsize=8,fontweight=300,bbox={'facecolor':'white','edgecolor':'black','pad':2},fontfamily='serif')
+        plt.savefig(f"{out_dir}/{tag}{sz:02d}-built-up_smoothed_reflectivity_{1e3*elev:05.0f}m_{MRMS_tstr}.png",dpi=250)
+        plt.close()
+
   timeb = default_timer()
   print(f"Time to smooth reflectivity array was {timeb-timea:.2f} s")
 
   smoothed_reflectivity[z,:,:] = np.where(np.isnan(input_reflectivity),-10.0,smoothed_reflectivity[z,:,:])
+
+  time_one = default_timer()
+  plt.figure(figsize=(fig_x,fig_y))
+  ax = plt.gcf().add_axes([0.01,0.01,0.98,0.98],projection=proj)
+  ax.set_extent([lon1,lon2,lat1,lat2],crs=proj)
+  ax.coastlines(linewidth=0.5,resolution='50m')
+  ax.add_feature(cfeature.BORDERS,edgecolor='black',linewidth=1,zorder=3)
+  ax.add_feature(cfeature.STATES,edgecolor='0.5',linewidth=0.5,zorder=2)
+  cp = ax.contourf(grid_lons,grid_lats,smoothed_reflectivity[z,:,:],colors=dBZ_colors,levels=dBZ_levs,extend='both',transform=proj,transform_first=True)
+  if True:
+   ct = ax.contour(grid_lons,grid_lats,beam_grid_size_ratio[z,:,:],levels=np.arange(2.0,9.1,1.0),colors=[1.0,0.5,0.5],linewidths=0.5)
+   clbls = ax.clabel(CS=ct,levels=ct.levels,colors='red',fontsize=4,fmt='%.0f')
+   for cl in clbls:
+    cl.set_rotation(0)
+  cb = plt.colorbar(mappable=cp,orientation='horizontal',fraction=cb_fract,shrink=0.5,aspect=40,pad=0.02,ticks=dBZ_levs)
+  cb.set_label(f"Reflectivity at {1e3*elev:.0f} m ASL",fontsize=8)
+  cb.ax.tick_params(labelsize=6)
+  plt.figtext(0.01,0.01,f"Valid time: {MRMS_tstr}",ha='left',va='bottom',fontsize=8,fontweight=300,bbox={'facecolor':'white','edgecolor':'black','pad':2})
+#  plt.figtext(0.01,0.01,f"Height: {1e3*elev:.0f} m ASL",ha='left',va='bottom',fontsize=8,fontweight=300,bbox={'facecolor':'white','edgecolor':'black','pad':2},fontfamily='serif')
+  plt.savefig(f"{out_dir}/{tag}nature_run_smoothed_reflectivity_{1e3*elev:05.0f}m_{MRMS_tstr}.png",dpi=250)
+  plt.close()
+
 
   gas_attenuation = attenuate_gas(elevation_angle_3D[z,:,:],slant_range[z,:,:]/1e3,wavelength_band)
   rain_attenuation = np.zeros_like(gas_attenuation)
@@ -208,7 +284,7 @@ for z,elev in enumerate(MRMS_heights):
      if term_a < 1.0 or term_c <= 10:
         continue
      # At each radar, identify the azimuths where there was radar reflectivity
-     this_radar_mask = (nearest_ID[z,:,:] == nr+1) & (smoothed_reflectivity[z,:,:] > 20.0) # This threshold can probably be lifted as high as 20-30 dBZ if need to cut out more computations
+     this_radar_mask = (nearest_ID[z,:,:] == nr+1) & (smoothed_reflectivity[z,:,:] > 10.0) # This threshold can probably be lifted as high as 20-30 dBZ if need to cut out more computations
      idx_azs = np.argwhere(this_radar_mask)
      this_azimuth_rows = idx_azs[:,0]
      this_azimuth_cols = idx_azs[:,1]
@@ -239,27 +315,30 @@ for z,elev in enumerate(MRMS_heights):
      print(f"processing rain attenuation for this radar took {time_j - time_i:.2f} s")
   processed_reflectivity[z,:,:] = smoothed_reflectivity[z,:,:] - gas_attenuation - rain_attenuation
 
-  time_one = default_timer()
-  plt.figure(figsize=(fig_x,fig_y))
-  ax = plt.gcf().add_axes([0.01,0.01,0.98,0.98],projection=proj)
-  ax.set_extent([lon1,lon2,lat1,lat2],crs=proj)
-  ax.coastlines(linewidth=0.5,resolution='50m')
-  ax.add_feature(cfeature.BORDERS,edgecolor='black',linewidth=1,zorder=3)
-  ax.add_feature(cfeature.STATES,edgecolor='0.5',linewidth=0.5,zorder=2)
-  cp = ax.contourf(grid_lons,grid_lats,smoothed_reflectivity[z,:,:],colors=dBZ_colors,levels=dBZ_levs,extend='both',transform=proj,transform_first=True)
   if False:
-   ct = ax.contour(grid_lons,grid_lats,beam_grid_size_ratio[z,:,:],levels=np.arange(2.0,9.1,1.0),colors=[1.0,0.5,0.5],linewidths=0.5)
-   clbls = ax.clabel(CS=ct,levels=ct.levels,colors='red',fontsize=4,fmt='%.0f')
-   for cl in clbls:
-    cl.set_rotation(0)
-  cb = plt.colorbar(mappable=cp,orientation='horizontal',fraction=cb_fract,shrink=0.5,aspect=40,pad=0.02,ticks=dBZ_levs)
-  cb.set_label(f"Reflectivity at {1e3*elev:.0f} m ASL",fontsize=8)
-  cb.ax.tick_params(labelsize=6)
-  plt.figtext(0.01,0.01,f"Valid time: {MRMS_tstr}",ha='left',va='bottom',fontsize=8,fontweight=300,bbox={'facecolor':'white','edgecolor':'black','pad':2})
-#  plt.figtext(0.01,0.01,f"Height: {1e3*elev:.0f} m ASL",ha='left',va='bottom',fontsize=8,fontweight=300,bbox={'facecolor':'white','edgecolor':'black','pad':2},fontfamily='serif')
-#  plt.savefig(f"{out_dir}/nature_run_smoothed_reflectivity_{1e3*elev:05.0f}m_{MRMS_tstr}.png",dpi=250)
-  plt.savefig(f"{out_dir}/zoom_Texas_nature_run_smoothed_reflectivity_{1e3*elev:05.0f}m_{MRMS_tstr}.png",dpi=250)
-  plt.close()
+   cmap = colormaps['cubehelix_r']
+   levels = np.arange(0.0,4.0,0.25)
+   cols = cmap(np.linspace(0,1,len(levels)+1))
+   time_one = default_timer()
+   plt.figure(figsize=(fig_x,fig_y))
+   ax = plt.gcf().add_axes([0.01,0.01,0.98,0.98],projection=proj)
+   ax.set_extent([lon1,lon2,lat1,lat2],crs=proj)
+   ax.coastlines(linewidth=0.5,resolution='50m')
+   ax.add_feature(cfeature.BORDERS,edgecolor='black',linewidth=1,zorder=3)
+   ax.add_feature(cfeature.STATES,edgecolor='0.5',linewidth=0.5,zorder=2)
+   cp = ax.contourf(grid_lons,grid_lats,gas_attenuation,colors=cols,levels=levels,extend='max',transform=proj)
+   if False:
+    ct = ax.contour(grid_lons,grid_lats,beam_grid_size_ratio[z,:,:],levels=np.arange(2.0,9.1,1.0),colors=[1.0,0.5,0.5],linewidths=0.5)
+    clbls = ax.clabel(CS=ct,levels=ct.levels,colors='red',fontsize=4,fmt='%.0f')
+    for cl in clbls:
+     cl.set_rotation(0)
+   cb = plt.colorbar(mappable=cp,orientation='horizontal',fraction=cb_fract,shrink=0.5,aspect=40,pad=0.02,ticks=levels)
+   cb.set_label(f"Reduction of reflectivity due to gas attentuation at {1e3*elev:.0f} m ASL [dBZ]",fontsize=8)
+   cb.ax.tick_params(labelsize=6)
+   plt.figtext(0.01,0.01,f"Valid time: {MRMS_tstr}",ha='left',va='bottom',fontsize=8,fontweight=300,bbox={'facecolor':'white','edgecolor':'black','pad':2})
+ #  plt.figtext(0.01,0.01,f"Height: {1e3*elev:.0f} m ASL",ha='left',va='bottom',fontsize=8,fontweight=300,bbox={'facecolor':'white','edgecolor':'black','pad':2},fontfamily='serif')
+   plt.savefig(f"{out_dir}/{tag}nature_run_gas_attenuation_{1e3*elev:05.0f}m_{MRMS_tstr}.png",dpi=250)
+   plt.close()
 
   plt.figure(figsize=(fig_x,fig_y))
   ax = plt.gcf().add_axes([0.01,0.01,0.98,0.98],projection=proj)
@@ -273,8 +352,7 @@ for z,elev in enumerate(MRMS_heights):
   cb.ax.tick_params(labelsize=6)
   plt.figtext(0.01,0.01,f"Valid time: {MRMS_tstr}",ha='left',va='bottom',fontsize=8,fontweight=300,bbox={'facecolor':'white','edgecolor':'black','pad':2},fontfamily='monospace')
 #  plt.figtext(0.01,0.01,f"Height: {1e3*elev:.0f} m ASL",ha='left',va='bottom',fontsize=8,fontweight=300,bbox={'facecolor':'white','edgecolor':'black','pad':2},fontfamily='serif')
-#  plt.savefig(f"{out_dir}/nature_run_processed_reflectivity_{1e3*elev:05.0f}m_{MRMS_tstr}.png",dpi=250)
-  plt.savefig(f"{out_dir}/zoom_Texas_nature_run_processed_reflectivity_{1e3*elev:05.0f}m_{MRMS_tstr}.png",dpi=250)
+  plt.savefig(f"{out_dir}/{tag}nature_run_processed_reflectivity_{1e3*elev:05.0f}m_{MRMS_tstr}.png",dpi=250)
   plt.close()
 
   if False:
@@ -298,50 +376,50 @@ for z,elev in enumerate(MRMS_heights):
    plt.savefig(f"{out_dir}/rain_rate_{1e3*elev:05.0f}m_{MRMS_tstr}.png",dpi=250)
    plt.close()
 
-  cmap = colormaps['winter_r']
-  levels = np.geomspace(1e-3,3.0,20)
-  cols = cmap(np.linspace(0,1,len(levels)+1))
+  if False:
+   cmap = colormaps['winter_r']
+   levels = np.geomspace(1e-3,3.0,20)
+   cols = cmap(np.linspace(0,1,len(levels)+1))
 
-  plt.figure(figsize=(fig_x,fig_y))
-  ax = plt.gcf().add_axes([0.01,0.01,0.98,0.98],projection=proj)
-  ax.set_extent([lon1,lon2,lat1,lat2],crs=proj)
-  ax.coastlines(linewidth=0.5,resolution='50m')
-  ax.add_feature(cfeature.BORDERS,edgecolor='black',linewidth=1,zorder=3)
-  ax.add_feature(cfeature.STATES,edgecolor='0.5',linewidth=0.5,zorder=2)
-  to_plot = np.where(smoothed_reflectivity[z,:,:] >= 5.0,rain_attenuation_rate,np.nan)
-  cp = ax.contourf(grid_lons,grid_lats,to_plot,colors=cols,levels=levels,extend='both',transform=proj,transform_first=True)
-#  ct = ax.contour(grid_lons,grid_lats,smoothed_reflectivity[z,:,:],levels=range(5,51,5),colors='black',linewidths=[0.1,0.1,0.1,0.25,0.25,0.25,0.5,0.5,0.5,0.75])
-  cb = plt.colorbar(mappable=cp,orientation='horizontal',fraction=cb_fract,shrink=0.9,aspect=50,pad=0.02,ticks=levels)
-  cb.set_label(f"Rainfall attenuation rate [dBZ/km]",fontsize=8)
-  cb.ax.tick_params(labelsize=6)
-  plt.figtext(0.01,0.01,f"Valid time: {MRMS_tstr}",ha='left',va='bottom',fontsize=8,fontweight=300,bbox={'facecolor':'white','edgecolor':'black','pad':2},fontfamily='monospace')
-#  plt.figtext(0.01,0.01,f"Height: {1e3*elev:.0f} m ASL",ha='left',va='bottom',fontsize=8,fontweight=300,bbox={'facecolor':'white','edgecolor':'black','pad':2},fontfamily='serif')
-  plt.savefig(f"{out_dir}/zoom_Texas_rain_attenuation_rate_{1e3*elev:05.0f}m_{MRMS_tstr}.png",dpi=250)
-  plt.close()
+   plt.figure(figsize=(fig_x,fig_y))
+   ax = plt.gcf().add_axes([0.01,0.01,0.98,0.98],projection=proj)
+   ax.set_extent([lon1,lon2,lat1,lat2],crs=proj)
+   ax.coastlines(linewidth=0.5,resolution='50m')
+   ax.add_feature(cfeature.BORDERS,edgecolor='black',linewidth=1,zorder=3)
+   ax.add_feature(cfeature.STATES,edgecolor='0.5',linewidth=0.5,zorder=2)
+   to_plot = np.where(smoothed_reflectivity[z,:,:] > 0.0,rain_attenuation_rate,np.nan)
+   cp = ax.contourf(grid_lons,grid_lats,to_plot,colors=cols,levels=levels,extend='both',transform=proj,transform_first=True)
+ #  ct = ax.contour(grid_lons,grid_lats,smoothed_reflectivity[z,:,:],levels=range(5,51,5),colors='black',linewidths=[0.1,0.1,0.1,0.25,0.25,0.25,0.5,0.5,0.5,0.75])
+   cb = plt.colorbar(mappable=cp,orientation='horizontal',fraction=cb_fract,shrink=0.9,aspect=50,pad=0.02,ticks=levels)
+   cb.set_label(f"Rainfall attenuation rate [dBZ/km]",fontsize=8)
+   cb.ax.tick_params(labelsize=6)
+   plt.figtext(0.01,0.01,f"Valid time: {MRMS_tstr}",ha='left',va='bottom',fontsize=8,fontweight=300,bbox={'facecolor':'white','edgecolor':'black','pad':2},fontfamily='monospace')
+ #  plt.figtext(0.01,0.01,f"Height: {1e3*elev:.0f} m ASL",ha='left',va='bottom',fontsize=8,fontweight=300,bbox={'facecolor':'white','edgecolor':'black','pad':2},fontfamily='serif')
+   plt.savefig(f"{out_dir}/{tag}rain_attenuation_rate_{1e3*elev:05.0f}m_{MRMS_tstr}.png",dpi=250)
+   plt.close()
 
-  cmap = colormaps['gnuplot2_r']
-  levels = np.arange(0.1,2.6,0.1)
-  cols = cmap(np.linspace(0,1,len(levels)+1))
+   cmap = colormaps['gnuplot2_r']
+   levels = np.arange(0.1,2.6,0.1)
+   cols = cmap(np.linspace(0,1,len(levels)+1)) 
 
-  plt.figure(figsize=(fig_x,fig_y))
-  ax = plt.gcf().add_axes([0.01,0.01,0.98,0.98],projection=proj)
-  ax.set_extent([lon1,lon2,lat1,lat2],crs=proj)
-  ax.coastlines(linewidth=0.5,resolution='50m')
-  ax.add_feature(cfeature.BORDERS,edgecolor='black',linewidth=1,zorder=3)
-  ax.add_feature(cfeature.STATES,edgecolor='0.5',linewidth=0.5,zorder=2)
-  cp = ax.contourf(grid_lons,grid_lats,rain_attenuation,colors=cols,levels=levels,extend='both',transform=proj,transform_first=True)
-  ct = ax.contour(grid_lons,grid_lats,smoothed_reflectivity[z,:,:],levels=range(20,51,5),colors='black',linewidths=[0.1,0.25,0.25,0.25,0.5,0.5,0.5,0.75])
-#  ct = ax.contour(grid_lons,grid_lats,smoothed_reflectivity[z,:,:],levels=[10,30,50],colors='black',linewidths=[0.1,0.25,0.5])
-  cb = plt.colorbar(mappable=cp,orientation='horizontal',fraction=cb_fract,shrink=0.5,aspect=40,pad=0.02,ticks=levels)
-  cb.set_label(f"Reduction in radar reflectivity due to rain attenuation [dBZ]",fontsize=8)
-  cb.ax.tick_params(labelsize=6)
-  plt.figtext(0.01,0.01,f"Valid time: {MRMS_tstr}",ha='left',va='bottom',fontsize=8,fontweight=300,bbox={'facecolor':'white','edgecolor':'black','pad':2},fontfamily='monospace')
-#  plt.figtext(0.01,0.01,f"Height: {1e3*elev:.0f} m ASL",ha='left',va='bottom',fontsize=8,fontweight=300,bbox={'facecolor':'white','edgecolor':'black','pad':2},fontfamily='serif')
-#  plt.savefig(f"{out_dir}/rain_attenuation_{1e3*elev:05.0f}m_{MRMS_tstr}.png",dpi=500)
-  plt.savefig(f"{out_dir}/zoom_Texas_rain_attenuation_{1e3*elev:05.0f}m_{MRMS_tstr}.png",dpi=250)
-  plt.close()
-  time_two = default_timer()
-  print(f"Time to create graphics: {time_two - time_one:.2f} s")
+   plt.figure(figsize=(fig_x,fig_y))
+   ax = plt.gcf().add_axes([0.01,0.01,0.98,0.98],projection=proj)
+   ax.set_extent([lon1,lon2,lat1,lat2],crs=proj)
+   ax.coastlines(linewidth=0.5,resolution='50m')
+   ax.add_feature(cfeature.BORDERS,edgecolor='black',linewidth=1,zorder=3)
+   ax.add_feature(cfeature.STATES,edgecolor='0.5',linewidth=0.5,zorder=2)
+   cp = ax.contourf(grid_lons,grid_lats,rain_attenuation,colors=cols,levels=levels,extend='both',transform=proj,transform_first=True)
+   ct = ax.contour(grid_lons,grid_lats,smoothed_reflectivity[z,:,:],levels=range(20,51,5),colors='black',linewidths=[0.1,0.25,0.25,0.25,0.5,0.5,0.5,0.75])
+ #  ct = ax.contour(grid_lons,grid_lats,smoothed_reflectivity[z,:,:],levels=[10,30,50],colors='black',linewidths=[0.1,0.25,0.5])
+   cb = plt.colorbar(mappable=cp,orientation='horizontal',fraction=cb_fract,shrink=0.5,aspect=40,pad=0.02,ticks=levels)
+   cb.set_label(f"Reduction in radar reflectivity due to rain attenuation [dBZ]",fontsize=8)
+   cb.ax.tick_params(labelsize=6)
+   plt.figtext(0.01,0.01,f"Valid time: {MRMS_tstr}",ha='left',va='bottom',fontsize=8,fontweight=300,bbox={'facecolor':'white','edgecolor':'black','pad':2},fontfamily='monospace')
+ #  plt.figtext(0.01,0.01,f"Height: {1e3*elev:.0f} m ASL",ha='left',va='bottom',fontsize=8,fontweight=300,bbox={'facecolor':'white','edgecolor':'black','pad':2},fontfamily='serif')
+   plt.savefig(f"{out_dir}/{tag}rain_attenuation_{1e3*elev:05.0f}m_{MRMS_tstr}.png",dpi=500)
+   plt.close()
+   time_two = default_timer()
+   print(f"Time to create graphics: {time_two - time_one:.2f} s")
 
   print(f"Creating output file {out_dir}/{prod_name}_{elev:05.2f}_{MRMS_tstr}_processed.grib2")
   # Create output GRIB2 message and write file

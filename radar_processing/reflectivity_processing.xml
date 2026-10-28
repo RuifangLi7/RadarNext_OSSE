@@ -3,21 +3,22 @@
 [
 
 <!ENTITY WR1 "/work/noaa/wrfruc/jdduda">
-<!ENTITY WORKDIR "&WR1;/radar_mask">
-<!ENTITY LOGDIR "&WR1;/radar_mask/log">
-<!ENTITY SCRIPT "&WR1;/radar_mask/run_process_script.bash">
+<!ENTITY ROOT "&WR1;/RadarNext">
+<!ENTITY LOGDIR "&ROOT;/log">
+<!ENTITY SCRIPT "&ROOT;/processing/run_process_script.bash">
 <!ENTITY ORION_OR_HERCULES "hercules-2">
 <!ENTITY RADARDIR "/work2/noaa/wrfruc/Ruifang.Li/RadarNext_OSSE/Data/refl_simulated">
+<!ENTITY TSTR "00"> <!-- should be either "00" or "*/15" -->
 ]>
 
 <workflow realtime="F" scheduler="slurm" cyclethrottle="9999" taskthrottle="150">
 
   <log><cyclestr>&LOGDIR;/workflow_@Y@m@d@H@M.log</cyclestr></log>
     
-  <cycledef group="main">*/15 12-23  29 4 2022 *</cycledef>
-  <cycledef group="main">*/15   *    30 4 2022 *</cycledef>
-  <cycledef group="main">*/15   *   1-5 5 2022 *</cycledef>
-  <cycledef group="main">*/15  0-12   6 5 2022 *</cycledef>
+  <cycledef group="main">&TSTR; 12-23  29 4 2022 *</cycledef>
+  <cycledef group="main">&TSTR;   *    30 4 2022 *</cycledef>
+  <cycledef group="main">&TSTR;   *   1-5 5 2022 *</cycledef>
+  <cycledef group="main">&TSTR;  0-12   6 5 2022 *</cycledef>
 
   <task name="doitall" cycledefs="main" maxtries="9999">
 
@@ -33,6 +34,7 @@
 
     <envar><name>TIME</name><value><cyclestr>@Y@m@d@H@M</cyclestr></value></envar>
     <envar><name>RADAR_DIR</name><value>&RADARDIR;</value></envar>
+    <envar><name>SCRIPT_DIR</name><value>&ROOT;/processing</value></envar>
 
     <dependency>
      <and>
