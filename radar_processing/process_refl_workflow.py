@@ -13,25 +13,40 @@ from netCDF4 import Dataset
 from math import degrees, radians, pi, sqrt, exp
 from timeit import default_timer
 from os.path import isfile, isdir
-from os import makedirs
+from os import makedirs, environ, getenv
 from sys import argv, exit
 config['data_dir'] = "/work/noaa/wrfruc/jdduda/cartopy_shapefiles"
 time_start = default_timer()
 
-root = "/work/noaa/wrfruc/jdduda/RadarNext"
+if "TIME" not in environ:
+   print("ERROR: Environmental variable $TIME has not been set to a YYYYMMDDHHmm time string")
+   exit(1)
+if "RADAR_DIR" not in environ:
+   print("ERROR: Supply a location of interpolated radar data as $RADAR_DIR")
+   exit(1)
+if "MASK" not in environ:
+   print("ERROR: a radar mask file path must be supplied as $MASK")
+   exit(1)
+if "ROOT" not in environ:
+   print("ERROR: Input root directory for where this script is located ($ROOT)")
+   exit(1)
+if "NAME" not in environ:
+   print("ERROR: Input an experiment name as $NAME")
+   exit(1)
 
-case_date = argv[1]
+root = environ['ROOT']
+case_date = environ['TIME']
+MRMS_in_dir = environ['RADAR_DIR']
+mask_file = environ['MASK']
 case_dt = datetime.strptime(case_date,'%Y%m%d%H%M')
-out_dir = f"{root}/processed_reflectivity/{case_dt.strftime('%Y%m%d-%H%M00')}"
+out_dir = f"{root}/processed_reflectivity/{environ['NAME']}/{case_dt.strftime('%Y%m%d-%H%M00')}"
 print(out_dir)
 makedirs(out_dir,exist_ok=True)
 if not isdir(out_dir):
    print(f"Failed to create out directory {out_dir}")
    exit(2)
-MRMS_in_dir = "/work2/noaa/wrfruc/Ruifang.Li/RadarNext_OSSE/Data/refl_simulated"
 prod_name = "MergedReflectivityQC"
 
-mask_file = f"{root}/masking/radar_mask.nc"
 nci = Dataset(mask_file,'r')
 radar_mask = nci.variables['mask'][:]
 slant_range = nci.variables['slant_range'][:]
@@ -108,7 +123,7 @@ min_axis = distance.ELLIPSOIDS['WGS-84'][0]
 Re = sqrt(maj_axis*min_axis)*1000.
 MRMS_heights = [0.50,0.75,1.0,1.25,1.50,1.75,2.0,2.25,2.50,2.75,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,10.,11.,12.,13.,14.,15.,16.,17.,18.,19] # [km]
 
-# Since the latitude array in the raw MRMS files is inverted, I have to use inverted latitudes here, too.
+# Since the latitude array in the raw MRMS files is inverted, I have to use inverted latitudes here, too. So dumb.
 MRMS_lat_2 = 20.005
 MRMS_lon_1 = -129.995 # equivalent to 230.005 - 360
 MRMS_lat_1 = 54.995
@@ -127,7 +142,7 @@ elevation_angle_3D = np.flip(elevation_angle_3D,axis=1)
 azimuths = np.flipud(azimuths)
 nearest_ID = np.flip(nearest_ID,axis=1)
 
-terrain_file = "/work/noaa/wrfruc/jdduda/RadarNext/NR_terrain_MRMS_grid.nc"
+terrain_file = f"{root}/NR_terrain_MRMS_grid.nc"
 nc = Dataset(terrain_file,'r')
 terrain_2D = nc.variables['HGT_M'][:][0,:,:]
 nc.close()

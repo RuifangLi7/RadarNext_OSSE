@@ -3,7 +3,5 @@
 source /home/jduda/miniforge_source
 conda activate astropy
 
-set -x
-python -u ${SCRIPT_DIR}/process_refl_workflow.py ${TIME}
-
-set -
+# No need for command line arguments, as all necessary arguments will be read in from environmental vars in the Python script
+python -u ${SCRIPT_DIR}/process_refl_workflow.py
